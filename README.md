@@ -3,7 +3,7 @@ UPDATE
 
 Daftar disini https://t.me/HexacoinBot/wallet?startapp=1600062444
 
->instalasi
+instalasi
 >> git clone https://github.com/kutu48/Hexacore-Auto.git
 >> 
 >> cd Hexacore-Auto
