@@ -1,7 +1,7 @@
 UPDATE
 
 
-Daftar disini https://t.me/HexacoinBot/wallet?startapp=1600062444
+Sing up here https://t.me/HexacoinBot/wallet?startapp=1600062444
 
 instalasi
 >> git clone https://github.com/kutu48/Hexacore-Auto.git
@@ -12,7 +12,7 @@ instalasi
 >> 
 >> python3 hexaclaim.py for cliam mission
 
-Ubah data.txt dengan id:username tg mu
->support multi akun
+Change data.txt with Telegram id:username
+example
 >id1: username1
 >id2: username2
