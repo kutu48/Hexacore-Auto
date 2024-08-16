@@ -13,7 +13,8 @@ instalasi
 >> python3 hexaclaim.py for cliam mission
 
 Change data.txt with Telegram id:username
-example
+>example
+>
 >id1: username1
 >
 >id2: username2
