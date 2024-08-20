@@ -1,9 +1,30 @@
 import requests
 import random
 import time
+import urllib.parse
+import json
+
+# Fungsi untuk membaca data dari file data.txt dan extract user_id
+def load_user_data(filename):
+    with open(filename, "r") as file:
+        data = file.readlines()
+    
+    user_data = []
+    for line in data:
+        # Extract the `user` part of the payload
+        parsed_data = urllib.parse.parse_qs(line.strip())
+        user_info = parsed_data.get('user', [None])[0]
+        if user_info:
+            user_info_decoded = urllib.parse.unquote(user_info)
+            user_info_dict = json.loads(user_info_decoded)  # Using json.loads instead of eval for safety
+            user_id = user_info_dict.get("id")
+            username = user_info_dict.get("username")
+            user_data.append((user_id, username, line.strip()))
+    
+    return user_data
 
 # URL dan Header
-login_url = "https://ago-api.hexacore.io/api/app-auth"
+login_url = "https://ago-api.hexacore.io/api/app-auth"  # Pastikan ini didefinisikan di sini
 user_exists_url = "https://ago-api.hexacore.io/api/user-exists"
 balance_url_template = "https://ago-api.hexacore.io/api/balance/{}"
 cekin_url = "https://ago-api.hexacore.io/api/daily-checkin"
@@ -24,23 +45,29 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
 }
 
-# Fungsi untuk login dan mendapatkan token
-def login(user_id, username):
-    login_payload = {
-        "user_id": user_id,
-        "username": username
-    }
-    # Print the username and user_id from the login payload
-    print(f"Logging in with user_id: {user_id}, username: {username}")
-    response = requests.post(login_url, json=login_payload, headers=headers)
+# Fungsi untuk login dan mendapatkan token dari data.txt
+def login_from_data(data_line):
+    payload = {"data": data_line}
+    print(f"Mengambil Data Untuk Login")
+    response = requests.post(login_url, json=payload, headers=headers)
     try:
         response_data = response.json()
-        return response_data.get("token")
+        token = response_data.get("token")
+        if token:
+            # Extract user_info part to get user_id
+            parsed_data = urllib.parse.parse_qs(data_line)
+            user_info = parsed_data.get('user', [None])[0]
+            if user_info:
+                user_info_decoded = urllib.parse.unquote(user_info)
+                print(f"Decoded user_info: ........")  # Debug print
+                user_info_dict = json.loads(user_info_decoded)  # Safely parse JSON-like string
+                user_id = user_info_dict.get("id")
+                print(f"Token berhasil didapatkan: ........")
+                return token, user_id
     except requests.exceptions.JSONDecodeError:
-        print("Failed to decode JSON response during login. Response content:")
+        print("Gagal mendekode respons JSON. Konten respons:")
         print(response.text)
-        return None
-
+    return None, None
 
 # Fungsi untuk memeriksa apakah user sudah ada
 def check_user_exists(token):
@@ -53,8 +80,20 @@ def get_balance(user_id, token):
     balance_url = balance_url_template.format(user_id)
     headers['Authorization'] = token
     response = requests.get(balance_url, headers=headers)
-    balance_data = response.json()
-    return balance_data.get("user_id"), balance_data.get("balance")
+    
+    if response.status_code == 200:
+        try:
+            balance_data = response.json()
+            return balance_data.get("user_id"), balance_data.get("balance")
+        except requests.exceptions.JSONDecodeError:
+            print("Failed to decode JSON response during balance retrieval. Response content:")
+            print(response.text)
+            return None, None
+    else:
+        print(f"Failed to retrieve balance. HTTP Status Code: {response.status_code}")
+        print("Response content:")
+        print(response.text)
+        return None, None
 
 # Fungsi untuk daily check-in
 def daily_checkin(token):
@@ -78,15 +117,12 @@ def buy_taps(token):
     response = requests.post(buy_taps_url, json=buy_taps_payload, headers=headers)
     
     try:
-        # Try to parse the response as JSON
         response_data = response.json()
         return response_data.get("success")
     except requests.exceptions.JSONDecodeError:
-        # If JSON decoding fails, print the response content for debugging
-        print("Failed to decode JSON response. Response content:")
+        print("Gagal mendekode respons JSON. Konten respons:")
         print(response.text)
         return None
-
 
 # Fungsi untuk melakukan klik mining
 def mining_complete(token):
@@ -96,54 +132,53 @@ def mining_complete(token):
     print(f"Klik Payload: {klik_payload}")
     return response.json().get("success")
 
-# Fungsi untuk membaca data dari file data.txt
-def load_user_data(filename):
-    with open(filename, "r") as file:
-        data = file.readlines()
-    user_data = [line.strip().split(":") for line in data]
-    return user_data
-
-# Main function
+# Fungsi utama untuk menjalankan seluruh alur proses secara bergantian untuk setiap user
 def main():
-    user_data = load_user_data("data.txt")
-    for user_id, username in user_data:
-        token = login(user_id, username)
-        if token:
-            print(f"Token: Sukses Mendapatkan Token")
+    data_file = "data.txt"
+    user_data_list = load_user_data(data_file)
+    
+    while True:
+        for user_id, username, data_line in user_data_list:
+            print(f"\nProcessing user: {username} (ID: {user_id})")
+            token, user_id = login_from_data(data_line)
+            if token:
+                print(f"Token: Sukses Mendapatkan Token")
 
-            # Check user exists
-            exists = check_user_exists(token)
-            print(f"User Exists: {exists}")
+                # Check user exists
+                exists = check_user_exists(token)
+                print(f"User Exists: {exists}")
 
-            # Get balance
-            user_id, balance = get_balance(user_id, token)
-            print(f"User ID: {user_id}, Balance: {balance}")
+                # Get balance
+                user_id, balance = get_balance(user_id, token)
+                print(f"User ID: {user_id}, Balance: {balance}")
 
-            # Daily check-in
-            available_at, success = daily_checkin(token)
-            print(f"Daily Check-in: Success={success}, Available at={available_at}")
+                # Daily check-in
+                available_at, success = daily_checkin(token)
+                print(f"Daily Check-in: Success={success}, Available at={available_at}")
 
-            # Check available taps
-            available_taps = check_available_taps(token)
-            print(f"Available Taps: {available_taps}")
+                # Check available taps
+                available_taps = check_available_taps(token)
+                print(f"Available Taps: {available_taps}")
 
-            # Buy taps
-            success = buy_taps(token)
-            print(f"Buy Taps: Success={success}")
+                # Buy taps
+                success = buy_taps(token)
+                print(f"Buy Taps: Success={success}")
 
-            # Mining complete
-            success = mining_complete(token)
-            print(f"Mining Complete: Success={success}")
+                # Mining complete
+                success = mining_complete(token)
+                print(f"Mining Complete: Success={success}")
 
-            # Countdown before next iteration
-            delay = random.randint(5, 10)
-            print(f"Waiting for {delay} seconds before next iteration...")
-            for i in range(delay, 0, -1):
-                print(f"{i} seconds remaining...", end="\r")
-                time.sleep(1)
-        else:
-            print("Login failed!")
+                # Countdown before next user iteration
+                delay = random.randint(5, 10)
+                print(f"Waiting for {delay} seconds before processing next user...")
+                for i in range(delay, 0, -1):
+                    print(f"{i} seconds remaining...", end="\r")
+                    time.sleep(1)
+            else:
+                print("Login failed!")
+
+        print("\nAll users processed. Starting the next cycle...")
+        time.sleep(30)  # Delay before starting the next full cycle of all users
 
 if __name__ == "__main__":
-    while True:
-        main()
+    main()
