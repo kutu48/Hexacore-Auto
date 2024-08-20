@@ -1,2 +1,5 @@
-id1:@user1
-id2:@user2
+user=1
+user=2
+or 
+query_id=1
+query_id=2
