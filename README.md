@@ -15,6 +15,6 @@ instalasi
 Change data.txt with Telegram id:username
 >example
 >
->id1: username1
+>query_id=1
 >
->id2: username2
+>query_id=2
