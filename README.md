@@ -15,9 +15,9 @@
 
      python3 bot.py 
 
-##Run Bot for auto     
+##Run Bot for auto cliam mission   
 
-     python3 hexaclaim.py for cliam mission
+     python3 hexaclaim.py
 
      
 ## Change data.txt with Telegram id:username
