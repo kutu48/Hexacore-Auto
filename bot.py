@@ -4,27 +4,25 @@ import time
 import urllib.parse
 import json
 
-# Fungsi untuk membaca data dari file data.txt dan extract user_id
 def load_user_data(filename):
     with open(filename, "r") as file:
         data = file.readlines()
     
     user_data = []
     for line in data:
-        # Extract the `user` part of the payload
         parsed_data = urllib.parse.parse_qs(line.strip())
         user_info = parsed_data.get('user', [None])[0]
         if user_info:
             user_info_decoded = urllib.parse.unquote(user_info)
-            user_info_dict = json.loads(user_info_decoded)  # Using json.loads instead of eval for safety
+            user_info_dict = json.loads(user_info_decoded)
             user_id = user_info_dict.get("id")
             username = user_info_dict.get("username")
             user_data.append((user_id, username, line.strip()))
     
     return user_data
 
-# URL dan Header
-login_url = "https://ago-api.hexacore.io/api/app-auth"  # Pastikan ini didefinisikan di sini
+# URLs and Headers
+login_url = "https://ago-api.hexacore.io/api/app-auth"
 user_exists_url = "https://ago-api.hexacore.io/api/user-exists"
 balance_url_template = "https://ago-api.hexacore.io/api/balance/{}"
 cekin_url = "https://ago-api.hexacore.io/api/daily-checkin"
@@ -36,46 +34,35 @@ headers = {
     "Content-Type": "application/json",
     "Origin": "https://ago-wallet.hexacore.io",
     "Referer": "https://ago-wallet.hexacore.io/",
-    "Sec-Ch-Ua": '"Not/A)Brand";v="8", "Chromium";v="126", "Microsoft Edge";v="126", "Microsoft Edge WebView2";v="126"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-site",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
 }
 
-# Fungsi untuk login dan mendapatkan token dari data.txt
 def login_from_data(data_line):
     payload = {"data": data_line}
-    print(f"Mengambil Data Untuk Login")
+    print("Mengambil Data Untuk Login")
     response = requests.post(login_url, json=payload, headers=headers)
     try:
         response_data = response.json()
         token = response_data.get("token")
         if token:
-            # Extract user_info part to get user_id
             parsed_data = urllib.parse.parse_qs(data_line)
             user_info = parsed_data.get('user', [None])[0]
             if user_info:
                 user_info_decoded = urllib.parse.unquote(user_info)
-                print(f"Decoded user_info: ........")  # Debug print
-                user_info_dict = json.loads(user_info_decoded)  # Safely parse JSON-like string
+                user_info_dict = json.loads(user_info_decoded)
                 user_id = user_info_dict.get("id")
-                print(f"Token berhasil didapatkan: ........")
+                print("Token berhasil didapatkan")
                 return token, user_id
     except requests.exceptions.JSONDecodeError:
         print("Gagal mendekode respons JSON. Konten respons:")
         print(response.text)
     return None, None
 
-# Fungsi untuk memeriksa apakah user sudah ada
 def check_user_exists(token):
     headers['Authorization'] = token
     response = requests.get(user_exists_url, headers=headers)
     return response.json().get("exists")
 
-# Fungsi untuk mendapatkan balance
 def get_balance(user_id, token):
     balance_url = balance_url_template.format(user_id)
     headers['Authorization'] = token
@@ -95,20 +82,28 @@ def get_balance(user_id, token):
         print(response.text)
         return None, None
 
-# Fungsi untuk daily check-in
-def daily_checkin(token):
+def daily_checkin(token, day):
     headers['Authorization'] = token
-    cekin_payload = {"day": random.randint(1, 20)}
+    cekin_payload = {"day": day}
     response = requests.post(cekin_url, json=cekin_payload, headers=headers)
-    return response.json().get("available_at"), response.json().get("success")
+    try:
+        response_data = response.json()
+        available_at = response_data.get("available_at")
+        success = response_data.get("success")
+        print(f"Check for day {day} | Status Daily Check-in Day {day}: Success={success}, Available at={available_at}")
+        return available_at, success
+    except json.JSONDecodeError:
+        print(f"Check for day {day} | Status Daily Check-in Day {day}: Failed or Invalid Response")
+        return None, None
+    except requests.exceptions.RequestException as e:
+        print(f"Check for day {day} | Status Daily Check-in Day {day}: Failed or Invalid Response")
+        return None, None
 
-# Fungsi untuk cek taps yang tersedia
 def check_available_taps(token):
     headers['Authorization'] = token
     response = requests.get(cek_taps_url, headers=headers)
     return response.json().get("available_taps")
 
-# Fungsi untuk membeli taps
 def buy_taps(token):
     headers['Authorization'] = token
     buy_taps_options = ["1_days", "3_days", "7_days"]
@@ -124,7 +119,6 @@ def buy_taps(token):
         print(response.text)
         return None
 
-# Fungsi untuk melakukan klik mining
 def mining_complete(token):
     headers['Authorization'] = token
     klik_payload = {"taps": random.randint(50, 150)}
@@ -132,7 +126,6 @@ def mining_complete(token):
     print(f"Klik Payload: {klik_payload}")
     return response.json().get("success")
 
-# Fungsi utama untuk menjalankan seluruh alur proses secara bergantian untuk setiap user
 def main():
     data_file = "data.txt"
     user_data_list = load_user_data(data_file)
@@ -142,34 +135,34 @@ def main():
             print(f"\nProcessing user: {username} (ID: {user_id})")
             token, user_id = login_from_data(data_line)
             if token:
-                print(f"Token: Sukses Mendapatkan Token")
+                print("Token: Sukses Mendapatkan Token")
 
-                # Check user exists
                 exists = check_user_exists(token)
                 print(f"User Exists: {exists}")
 
-                # Get balance
                 user_id, balance = get_balance(user_id, token)
                 print(f"User ID: {user_id}, Balance: {balance}")
+                
+                # Loop through each day from 1 to 20 for daily check-in
+                for day in random.sample(range(1, 21), 20):
+                    available_at, success = daily_checkin(token, day)
+                    if available_at is not None and success is not None:
+                        print(f"Status Daily Check-in Day {day}: Success={success}, Available at={available_at}")
+                    else:
+                        print(f"Status Daily Check-in Day {day}: Failed or Invalid Response")
+                    time.sleep(0)  # Delay between check-ins for realism
 
-                # Daily check-in
-                available_at, success = daily_checkin(token)
-                print(f"Daily Check-in: Success={success}, Available at={available_at}")
 
-                # Check available taps
                 available_taps = check_available_taps(token)
                 print(f"Available Taps: {available_taps}")
 
-                # Buy taps
                 success = buy_taps(token)
                 print(f"Buy Taps: Success={success}")
 
-                # Mining complete
                 success = mining_complete(token)
                 print(f"Mining Complete: Success={success}")
 
-                # Countdown before next user iteration
-                delay = random.randint(5, 10)
+                delay = random.randint(3, 5)
                 print(f"Waiting for {delay} seconds before processing next user...")
                 for i in range(delay, 0, -1):
                     print(f"{i} seconds remaining...", end="\r")
@@ -178,7 +171,7 @@ def main():
                 print("Login failed!")
 
         print("\nAll users processed. Starting the next cycle...")
-        time.sleep(30)  # Delay before starting the next full cycle of all users
+        time.sleep(15)
 
 if __name__ == "__main__":
     main()
